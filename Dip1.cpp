@@ -28,7 +28,7 @@ void setAvgColor(Mat& image, Point point, int size, Vec3b color) {
 			for (int j = point.y; j < endOfY; j++) {
 				//proof for image bound in y
 				if (j < anzRows) {
-					//set everage colour
+					//set colour
 					image.at<Vec3b>(Point(i,j)) = color;
 				}
 			}
@@ -47,7 +47,6 @@ void pixelate(Mat& inputImage, Mat& outputImage, int sizeOfPixel) {
 	int anzRows = inputImage.rows; //#rows in matrix
 	int anzCols = inputImage.cols; //#columns in matrix
 	Point point; //begin of a Pixel-range in outputImage
-	//int sizeOfPixel = 2; //size of a pixel-range in outputImage
 	Vec3b color;
 
 	//walk through every column
@@ -59,7 +58,6 @@ void pixelate(Mat& inputImage, Mat& outputImage, int sizeOfPixel) {
 				if (j % sizeOfPixel == 0) {
 					point.x = i;
 					point.y = j;
-					//color = getAvgColor(inputImage, point, sizeOfPixel);
 					//color set by first pixel of group
 					color = inputImage.at<Vec3b>(point);
 					//set color for a group of pixels
@@ -83,15 +81,14 @@ void stainPicture(Mat& image, double newColor[3]) {
 	int colorA;
 	int colorB;
 
-	cout << "BGR:" << newColor[0] << "," << newColor[1] << "," << newColor[2] << endl;
 	//walk through every column
 	for (int i = 0; i < anzCols; i++) {
 		//walk through every row
 		for (int j = 0; j < anzRows; j++) {
 			//obtain the color blue/green/red from the current pixel
-			oldColor[0] = image.at<Vec3b>(Point(i, j)).val[0];	//blue
-			oldColor[1] = image.at<Vec3b>(Point(i, j)).val[1];	//green
-			oldColor[2] = image.at<Vec3b>(Point(i, j)).val[2];	//red
+			oldColor[0] = image.at<Vec3b>(Point(i, j)).val[0];	//yellow
+			oldColor[1] = image.at<Vec3b>(Point(i, j)).val[1];	//magenta
+			oldColor[2] = image.at<Vec3b>(Point(i, j)).val[2];	//cyan
 			
 			//set the new color {yellow, magenta, cyan} to the current pixel
 			for (int k = 0; k < 3; k++){
