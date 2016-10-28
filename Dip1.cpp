@@ -8,35 +8,6 @@
 
 #include "Dip1.h"
 
-/*
-Vec3b getAvgColor(Mat& image, Point point, int size) {
-	Vec3b color;
-
-	int colNumber = image.cols;
-	int rowNumber = image.rows;
-	int endOfX = point.x + size;
-	int endOfY = point.y + size;
-
-	//walk through every column
-	for (int i = point.x; i <= endOfX; i++) {
-		//proof for image bound in x
-		if (i <= colNumber) {
-			//walk through every row per column
-			for (int j = point.y; j <= endOfY; j++) {
-				//proof for image bound in y
-				if (j <= rowNumber) {
-					//calculate everage colour
-					//color.val[0] = ((color.val[0] + image.at<Vec3b>(Point(j, i)).val[0]) / 2);
-					//color.val[1] = ((color.val[1] + image.at<Vec3b>(Point(j, i)).val[1]) / 2);
-					//color.val[2] = ((color.val[2] + image.at<Vec3b>(Point(j, i)).val[2]) / 2);
-					
-				}
-			}
-		}
-	}
-	return color;
-}*/
-
 //funktion that sets a color for a range of pixels
 /*
 image image that schould be changed Mat&
@@ -109,6 +80,8 @@ void stainPicture(Mat& image, double newColor[3]) {
 	int anzRows = image.rows; //#rows in matrix
 	int anzCols = image.cols; //#columns in matrix
 	double oldColor[] = {0.0, 0.0, 0.0};
+	int colorA;
+	int colorB;
 
 	cout << "BGR:" << newColor[0] << "," << newColor[1] << "," << newColor[2] << endl;
 	//walk through every column
@@ -120,12 +93,27 @@ void stainPicture(Mat& image, double newColor[3]) {
 			oldColor[1] = image.at<Vec3b>(Point(i, j)).val[1];	//green
 			oldColor[2] = image.at<Vec3b>(Point(i, j)).val[2];	//red
 			
-			//set the new color blue/green/red to the current pixel
-			image.at<Vec3b>(Point(i, j)).val[0] = oldColor[0] - newColor[0];
-			image.at<Vec3b>(Point(i, j)).val[1] = oldColor[1] - newColor[1];
-			image.at<Vec3b>(Point(i, j)).val[2] = oldColor[2] - newColor[2];
+			//set the new color {yellow, magenta, cyan} to the current pixel
+			for (int k = 0; k < 3; k++){
+				//proof for bounds of color-space
+				//if beneath bounds -> 0 min
+				if ((oldColor[k] - newColor[k]) < 0){
+					image.at<Vec3b>(Point(i, j)).val[k] = 0;
+				}
+				//if above bounds -> 255 max
+				else if ((oldColor[k] - newColor[k]) > 255) {
+					image.at<Vec3b>(Point(i, j)).val[k] = 255;
+				}
+				//if not out of bounds -> calculate
+				else {
+					image.at<Vec3b>(Point(i, j)).val[k] = oldColor[k] - newColor[k];
+				}
+			}
 		}
 	}
+	//image.at<Vec3b>(Point(i, j)).val[0] = oldColor[0] - newColor[0];
+	//image.at<Vec3b>(Point(i, j)).val[1] = oldColor[1] - newColor[1];
+	//image.at<Vec3b>(Point(i, j)).val[2] = oldColor[2] - newColor[2];
 	return;
 }
 
@@ -140,9 +128,10 @@ Mat Dip1::doSomethingThatMyTutorIsGonnaLike(Mat& img){
 	Mat inputImage = img;
 	Mat outputImage = img;
 	
-	pixelate(inputImage, outputImage, 4);
+	pixelate(inputImage, outputImage, 8);
 
-	double color[] = {0.0, 100.0, 0.0};
+	//{yellow, magenta, cyan}
+	double color[] = {0.0, -255.0, 0.0};
 	stainPicture(outputImage, color);
 
 	return outputImage;
