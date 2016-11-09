@@ -52,7 +52,9 @@ Mat Dip2::spatialConvolution(Mat& src, Mat& kernel){
 				outputImage.col(x).row(y) = mean(mat2)*(kernel.cols*kernel.rows);
 			};
 		}
+		cout << ".";
 	}
+	cout << endl;
 
 	////Convolution-Method of OpenCV
 	//int ddepth = -1;
@@ -64,70 +66,42 @@ Mat Dip2::spatialConvolution(Mat& src, Mat& kernel){
    return outputImage;
 }
 
-Point2i getMedian(Mat& src, Point2i anchor, int size) {
-	//cout <<"Anchor: "<< anchor.x << "x" << anchor.y << endl;
-	// proof for valid input
-	//if (src.empty() || anchor.x == NULL || anchor.y == NULL || size == NULL) return -1;
-	//if (size % 2 == 0) {
-	//	cout << "Pls enter a odd-numbered size to enable anchor!" << endl;
-	//	return -1;
-	//}
-	Rect rect(anchor.x - ((size - 1)) / 2, anchor.y-((size-1)/2), size, size);
-	Mat mat = src(rect);
-
+float getMedian(Mat& src, Point2i anchor, int size) {
 
 	Point2i medianPixel = anchor;
 	Mat kernel = Mat::zeros(size, size, CV_8UC2);
-	int srcX = 0;
-	int srcY = 0;
-	//float array[9];
+	/*int srcX = 0;
+	int srcY = 0;*/
 	list<float> list;
-	/*cout << "List1: " << list.size << endl;
-	list.push_back(2);
-	cout << "List2: " << list.size << endl;
-	*///for (int x = anchor.x - ((size - 1) / 2); x <= anchor.x + ((size - 1) / 2); x++) {
+	float* array = new float[size*size];
+	int iterator = 0;
+	
 	for (int x = 0; x < size; x++) {
-		//for (int y = anchor.y - ((size - 1) / 2); y <= anchor.y + ((size - 1) / 2); y++) {
 		if (anchor.x - ((size - 1) / 2) + x < 0) {
-			srcX = 0;
-		}
-		else if (anchor.x - ((size - 1) / 2) + x >= src.cols) {
-			srcX = src.cols - 1;
-		}
-		else {
-			srcX = anchor.x - ((size - 1) / 2) + x;
-		}
-		for (int y = 0; y < size; y++) {
-
-			if (anchor.y - ((size - 1) / 2) + y < 0) {
-				srcY = 0;
+			return src.at<float>(anchor);
+			break;
+		} else if (anchor.x - ((size - 1) / 2) + x >= src.cols) {
+			return src.at<float>(anchor);
+			break;
+		} else {
+			for (int y = 0; y < size; y++) {
+				if (anchor.y - ((size - 1) / 2) + y < 0) {
+					return src.at<float>(anchor);
+					break;
+				} else if (anchor.y - ((size - 1) / 2) + y >= src.rows) {
+					return src.at<float>(anchor);
+					break;
+				} else {
+					array[iterator] = src.at<float>(Point(anchor.x - ((size - 1) / 2) + x, anchor.y - ((size - 1) / 2) + y));
+					iterator++;
+				}
 			}
-			else if (anchor.y - ((size - 1) / 2) + y >= src.rows) {
-				srcY = src.rows - 1;
-			}
-			else {
-				srcY = anchor.y - ((size - 1) / 2) + y;
-			}
-			list.push_back(src.at<float>(Point(srcX, srcY)));
-			//.push_back(Point(srcX, srcY));
 		}
 	}
-	list.sort();
-	//cout << "list: " << integerList.size << endl;
-	for (int i = 0; i < size; i++) {
-		list.pop_back();
-	}
-	/*while (src.at<float>(point2iList.back()) != list.back()) {
-		if (point2iList.empty()) {
-			cout << "ERROR - point2iList is empty" << endl;
-			waitKey(0);
-			return anchor;
-		}
-		point2iList.pop_back();
-	}*/
-	//cout << "medien: " << point2iList.back() << endl;
 
-	return Point(1, 1);//point2iList.back();
+	//int elements = sizeof(array) / sizeof(array[0]);
+	sort(array, array + iterator);
+	return array[(iterator - 1) / 2];
 }
 
 // the average filter
@@ -139,16 +113,52 @@ return:  filtered image
 */
 Mat Dip2::averageFilter(Mat& src, int kSize){
    // TO DO !!
-	//cout << "average:" << endl;
-	//cout << src << endl;
+	if (kSize % 2 == 0) {
+		cout << "bad filter-size. pls choose odd-number!" << endl;
+		return src.clone();
+	}
 	Mat kernel = Mat::ones(kSize, kSize, CV_32F);
 	for (int x = 0; x < kSize; x++) {
 		for (int y = 0; y < kSize; y++) {
 			kernel.col(x).row(y) = kernel.col(x).row(y) / (kSize*kSize);
 		}
 	}
+	
+	/* //kernel with heigher weight for near pixels//
+	int anz = 0;
+	int powX = 0;
+	int powY = 0;
+	Mat kernel = Mat::ones(kSize, kSize, CV_32F);
+	for (int x = 0; x < kSize; x++) {
+		if (x >((kSize - 1) / 2)) {
+			powX = x - ((kSize - 1) / 2) - 1;
+		}
+		else {
+			powX = x;
+		}
+		for (int y = 0; y < kSize; y++) {
+			if (y >((kSize - 1) / 2)) {
+				powY = y - ((kSize - 1) / 2) - 1;
+			}
+			else {
+				powY = y;
+			}
+			//kernel.col(x).row(y) = kernel.col(x).row(y) / (kSize*kSize);
+			kernel.col(x).row(y) = kernel.at<float>(Point(x, y)) * pow(2, powX) * pow(2, powY);
+			anz += pow(2, powX) * pow(2, powY);
+		}
+	}
+	for (int x = 0; x < kSize; x++) {
+		for (int y = 0; y < kSize; y++) {
+			//kernel.col(x).row(y) = kernel.col(x).row(y) / (kSize*kSize);
+			kernel.col(x).row(y) = kernel.col(x).row(y) / anz;
+		}
+	}
+	*/
+
+	/*cout << "kernel:"<<endl;
+	cout << kernel << endl;*/
 	Mat outputImage = spatialConvolution(src, kernel);
-	//cout << outputImage << endl;
    return outputImage;
 }
 
@@ -160,25 +170,33 @@ return:  filtered image
 */
 Mat Dip2::medianFilter(Mat& src, int kSize){
    // TO DO !!
-	//Mat ownImage = imread("noiseType_1.jpg", CV_LOAD_IMAGE_GRAYSCALE);
+	if (kSize % 2 == 0) {
+		cout << "bad filter-size. pls choose odd-number!" << endl;
+		return src.clone();
+	}
 	Mat outputImage = src.clone();//ownImage.clone();
 	Point2i anchor;
-	//cout << "kSize: " << kSize << endl;
+	cout << "kSize: " << kSize << endl;
 	//cout << "srcSize: " << src.cols << "x" << src.rows << endl;
 	for (int x = 0; x < src.cols; x++) {
 		anchor.x = x;
 		for (int y = 0; y < src.rows; y++) {
 			anchor.y = y;
 			//outputImage.at<float>(Point(x, y)) = src.at<float>(getMedian(src, anchor, kSize));
+			outputImage.at<float>(Point(x, y)) = getMedian(src, anchor, kSize);
+			//cout << outputImage.at<float>(Point(x, y)) << endl;
 		}
+		cout << ".";
 	}
 	//namedWindow("Test");
 	//imshow("Test", outputImage);
-	Mat dst;
+	/*Mat dst;
 	medianBlur(src, dst, kSize);
 	imshow("source", src);
-	imshow("result", dst);
-	return dst;//src.clone();
+	imshow("result", dst);*/
+	cout << endl;
+	cout << "median done..." << endl;
+	return outputImage;
 }
 
 // the bilateral filter
@@ -189,7 +207,10 @@ sigma:   standard-deviation of the radiometric kernel
 return:  filtered image
 */
 Mat Dip2::bilateralFilter(Mat& src, int kSize, double sigma){
-  
+	if (kSize % 2 == 0) {
+		cout << "bad filter-size. pls choose odd-number!" << endl;
+		return src.clone();
+	}
     return src.clone();
 
 }
@@ -241,7 +262,7 @@ void Dip2::run(void){
 	// ==> try also "bilateral" (and if implemented "nlm")
 	cout << "reduce noise" << endl;
 	Mat restorated1 = noiseReduction(noise1, "median", 3);
-	Mat restorated2 = noiseReduction(noise2, "", 1);
+	Mat restorated2 = noiseReduction(noise2, "average", 5);
 	cout << "done" << endl;
 	  
 	// save images
