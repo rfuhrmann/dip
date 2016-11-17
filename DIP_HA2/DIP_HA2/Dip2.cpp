@@ -8,6 +8,7 @@
 
 #include "Dip2.h"
 #include "list"
+#include <cmath>
 
 // convolution in spatial domain
 /*
@@ -17,18 +18,13 @@ return:  convolution result
 */
 Mat Dip2::spatialConvolution(Mat& src, Mat& kernel){
    // TO DO !!
-	//cout << src << endl;
-	//cout << endl << kernel << endl;
 	//1. flip kernel
 	Mat flipKernel = Mat(kernel.cols, kernel.rows, CV_32FC1);
 	for (int x = 0; x < (kernel.cols); x++) {
-		//for (int x = 0; x < (mat.cols - 1) / 2; x++) {
 		for (int y = 0; y < (kernel.rows); y++) {
-			//for (int y = 0; y < (mat.rows - 1) / 2; y++) {
 			kernel.col(kernel.cols - 1 - x).row(kernel.rows - 1 - y).copyTo(flipKernel.col(x).row(y));
 		}
 	}
-
 	//2. re-center (not needed now)
 	//3. multiply and integrate
 	Mat outputImage = src.clone();
@@ -47,31 +43,134 @@ Mat Dip2::spatialConvolution(Mat& src, Mat& kernel){
 			} else {
 				mat1 = src(rect);
 				mat2 = mat1.mul(flipKernel);
-				//cout << mean(mat2).val[0] << endl;
-				//outputImage.at<float>(Point(x, y)) = mean(mat2).val[0]*(kernel.cols*kernel.rows);
 				outputImage.col(x).row(y) = mean(mat2)*(kernel.cols*kernel.rows);
 			};
 		}
 		cout << ".";
 	}
 	cout << endl;
-
-	////Convolution-Method of OpenCV
-	//int ddepth = -1;
-	//Point anchor = Point(-1, -1);
-	//double delta = 0;
-	//filter2D(src, outputImage, ddepth, flipKernel, anchor, delta, BORDER_DEFAULT);
-	//imshow("filter2D", outputImage);
-	//cout << outputImage << endl;
    return outputImage;
 }
 
+// build spatial kernel
+/*
+src:     input image
+kernel:  filter kernel
+return:  convolution result
+*/
+Mat buildSpatialKernel(int kSize) {
+
+	Mat kernel = Mat::ones(kSize, kSize, CV_32F);
+	int anz = 0;
+	int powX = 0;
+	int powY = 0;
+	
+	for (int x = 0; x < kSize; x++) {
+		if (x >((kSize - 1) / 2)) {
+			powX = x - ((kSize - 1) / 2) - 1;
+		} else {
+			powX = x;
+		}
+		for (int y = 0; y < kSize; y++) {
+			if (y >((kSize - 1) / 2)) {
+				powY = y - ((kSize - 1) / 2) - 1;
+			} else {
+				powY = y;
+			}
+			//kernel.col(x).row(y) = kernel.col(x).row(y) / (kSize*kSize);
+			kernel.col(x).row(y) = kernel.at<float>(Point(x, y)) * pow(2, powX) * pow(2, powY);
+			anz += pow(2, powX) * pow(2, powY);
+		}
+	}
+	for (int x = 0; x < kSize; x++) {
+		for (int y = 0; y < kSize; y++) {
+			//kernel.col(x).row(y) = kernel.col(x).row(y) / (kSize*kSize);
+			kernel.col(x).row(y) = kernel.col(x).row(y) / anz;
+		}
+	}
+	return kernel;
+}
+
+// build radiometric kernel
+/*
+src:     input image
+anchor:  anchor for kernel
+kSize:	 size for each side of the kernel
+sigma:	 sigma value for the kernel
+return:  radiometric kernel
+*/
+Mat buildRadiometricKernel(Mat& src, Point2d anchor, int kSize, double sigma) {
+	//proof for bound collision
+	if (anchor.x - ((kSize - 1) / 2) < 0 ||
+		anchor.y - ((kSize - 1) / 2) < 0 ||
+		anchor.x + ((kSize - 1) / 2) +1 >= src.cols ||
+		anchor.y + ((kSize - 1) / 2) +1 >= src.rows) {
+		return Mat::ones(kSize, kSize, CV_32F);
+	}
+	//get area from src
+	Rect rect(anchor.x - ((kSize - 1) / 2), anchor.y - ((kSize - 1) / 2), kSize, kSize);
+	Mat srcArea = src(rect);
+	Mat rKernel = Mat::ones(kSize, kSize, CV_32F);
+	float tmp = 0;
+	const float pi = 3.14159265358979323846;
+	float rad = (1 / (2 * pi*(sigma*sigma)));
+	float pq = 0;
+	float srcWeight = 0;
+	float anchorWeight = src.at<float>(Point((kSize - 1) / 2, (kSize - 1) / 2));
+	//process the formula for radiometric weight
+	for (int x = 0; x < kSize; x++) {
+		for (int y = 0; y < kSize; y++) {
+			srcWeight = srcArea.at<float>(Point(x, y));
+			pq = (anchorWeight - srcWeight);
+			rKernel.col(x).row(y) = rad * exp(-((pq*pq)/(2*(sigma*sigma))));
+			tmp += rKernel.at<float>(Point(x,y));
+		}
+	}
+	//normalize
+	tmp = 1 / tmp;
+	for (int x = 0; x < kSize; x++) {
+		for (int y = 0; y < kSize; y++) {
+			rKernel.col(x).row(y) = rKernel.at<float>(Point(x, y)) * tmp;
+		}
+	}
+	return rKernel;
+}
+
+/*
+src:     input image
+bKernel: bilateral kernel
+anchor:  anchor for kernel
+return:  bilateral weight
+*/
+float getBilateralWeight(Mat& src, Mat& bKernel, Point2i anchor) {
+	//proof for bound collision
+	if (anchor.x - ((bKernel.cols - 1) / 2) < 0 ||
+		anchor.y - ((bKernel.rows - 1) / 2) < 0 ||
+		anchor.x + ((bKernel.cols - 1) / 2) + 1 >= src.cols ||
+		anchor.y + ((bKernel.rows - 1) / 2) + 1 >= src.rows) {
+		return src.at<float>(anchor);
+	}
+	//get area from src
+	Rect rect(anchor.x - ((bKernel.cols - 1) / 2), anchor.y - ((bKernel.rows - 1) / 2), bKernel.cols, bKernel.rows);
+	Mat srcArea = src(rect);
+	//multiply filter to area in src
+	Mat tmp = srcArea.mul(bKernel);
+	//add individual weights to bilateral weight
+	float bilateralWeight = sum(tmp).val[0];
+	return bilateralWeight;
+}
+
+// get median of a Matrix
+/*
+src:     input image
+anchor:  anchor for kernel
+kSize:	 size for each side of the kernel
+return:  median
+*/
 float getMedian(Mat& src, Point2i anchor, int size) {
 
 	Point2i medianPixel = anchor;
 	Mat kernel = Mat::zeros(size, size, CV_8UC2);
-	/*int srcX = 0;
-	int srcY = 0;*/
 	list<float> list;
 	float* array = new float[size*size];
 	int iterator = 0;
@@ -156,8 +255,6 @@ Mat Dip2::averageFilter(Mat& src, int kSize){
 	}
 	*/
 
-	/*cout << "kernel:"<<endl;
-	cout << kernel << endl;*/
 	Mat outputImage = spatialConvolution(src, kernel);
    return outputImage;
 }
@@ -174,28 +271,17 @@ Mat Dip2::medianFilter(Mat& src, int kSize){
 		cout << "bad filter-size. pls choose odd-number!" << endl;
 		return src.clone();
 	}
-	Mat outputImage = src.clone();//ownImage.clone();
+	Mat outputImage = src.clone();
 	Point2i anchor;
-	cout << "kSize: " << kSize << endl;
-	//cout << "srcSize: " << src.cols << "x" << src.rows << endl;
 	for (int x = 0; x < src.cols; x++) {
 		anchor.x = x;
 		for (int y = 0; y < src.rows; y++) {
 			anchor.y = y;
-			//outputImage.at<float>(Point(x, y)) = src.at<float>(getMedian(src, anchor, kSize));
 			outputImage.at<float>(Point(x, y)) = getMedian(src, anchor, kSize);
-			//cout << outputImage.at<float>(Point(x, y)) << endl;
 		}
 		cout << ".";
 	}
-	//namedWindow("Test");
-	//imshow("Test", outputImage);
-	/*Mat dst;
-	medianBlur(src, dst, kSize);
-	imshow("source", src);
-	imshow("result", dst);*/
 	cout << endl;
-	cout << "median done..." << endl;
 	return outputImage;
 }
 
@@ -211,7 +297,44 @@ Mat Dip2::bilateralFilter(Mat& src, int kSize, double sigma){
 		cout << "bad filter-size. pls choose odd-number!" << endl;
 		return src.clone();
 	}
-    return src.clone();
+
+	Mat outputImage = src.clone();
+	//1. build spatial kernel according to kSize
+	Mat sKernel = buildSpatialKernel(kSize);
+	Mat flipKernel = Mat(kSize, kSize, CV_32FC1);
+	//for each pixel in src
+	for (int i = 0; i < src.cols; i++) {
+		for (int j = 0; j < src.rows; j++) {
+
+			//2. build radiometric kernel according to sigma
+			Mat rKernel = buildRadiometricKernel(src, Point(i,j), kSize, sigma);
+			//3. build bilateral kernel from spatial and radiometric kernel (multiply and normalize)
+			//bilateral kernel not normalized
+			Mat bKernel = sKernel.mul(rKernel);
+			//get factor for normalization
+			float tmp = sum(bKernel).val[0];
+			tmp = 1 / tmp;
+			//normalize
+			for (int x = 0; x < kSize; x++) {
+				for (int y = 0; y < kSize; y++) {
+					bKernel.col(x).row(y) = bKernel.col(x).row(y) * tmp;
+				}
+			}
+			//4. flip kernel
+			for (int x = 0; x < (bKernel.cols); x++) {
+				for (int y = 0; y < (bKernel.rows); y++) {
+					bKernel.col(bKernel.cols - 1 - x).row(bKernel.rows - 1 - y).copyTo(flipKernel.col(x).row(y));
+				}
+			}
+			bKernel = flipKernel;
+			//5. execute filter to src
+			outputImage.col(i).row(j) = getBilateralWeight(src, bKernel, Point(i,j));
+		}
+		cout << ".";
+	}
+	cout << endl;
+	//cv::bilateralFilter(src, outputImage, kSize, sigma, sigma, BORDER_CONSTANT);
+    return outputImage;
 
 }
 
@@ -261,8 +384,8 @@ void Dip2::run(void){
 	// ==> "average" or "median"? Why?
 	// ==> try also "bilateral" (and if implemented "nlm")
 	cout << "reduce noise" << endl;
-	Mat restorated1 = noiseReduction(noise1, "median", 3);
-	Mat restorated2 = noiseReduction(noise2, "average", 5);
+	Mat restorated1 = noiseReduction(noise1, "median", 3, 50);
+	Mat restorated2 = noiseReduction(noise2, "bilateral", 3, 50);
 	cout << "done" << endl;
 	  
 	// save images
