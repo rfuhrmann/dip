@@ -59,9 +59,6 @@ Mat Dip3::createGaussianKernel(int kSize) {
 			kernel.col(x).row(y) = kernel.at<float>(Point(x, y)) / anz;
 		}
 	}
-
-
-	//Mat outputImage = spatialConvolution(src, kernel);
 	return kernel;
 }
 
@@ -76,8 +73,34 @@ return   circular shifted matrix
 Mat Dip3::circShift(Mat& in, int dx, int dy) {
 
 	// TO DO !!!
-
-	return in;
+	Mat out = in.clone();
+	int currX = 0;
+	int currY = 0;
+	for (int x = 0; x < in.cols; x++) {
+		currX = x - dx;
+		//if walk through left border
+		if (currX < 0) {
+			currX = in.cols + (currX%in.cols);
+		}
+		//if walk through right border
+		else if (currX >= in.cols) {
+			currX = currX % in.cols;
+		}
+		for (int y = 0; y < in.rows; y++) {
+			currY = y - dy;
+			//if walk through top border
+			if (currY < 0) {
+				currY = in.rows + (currY%in.rows);
+			}
+			//if walk through bottom border
+			else if (currY >= in.rows) {
+				currY = currY % in.rows;
+			}
+			//cout << x << ":" << y << " - " << currX << ":" << currY << endl;
+			in.col(currX).row(currY).copyTo(out.col(x).row(y));
+		}
+	}
+	return out;
 }
 
 //Performes a convolution by multiplication in frequency domain
