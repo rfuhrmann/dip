@@ -20,12 +20,6 @@ Mat Dip3::createGaussianKernel(int kSize) {
 		cout << "bad filter-size. pls choose odd-number!" << endl;
 		return Mat::zeros(kSize, kSize, CV_32FC1);
 	}
-	//Mat kernel = Mat::ones(kSize, kSize, CV_32F);
-	//for (int x = 0; x < kSize; x++) {
-	//	for (int y = 0; y < kSize; y++) {
-	//		kernel.col(x).row(y) = kernel.col(x).row(y) / (kSize*kSize);
-	//	}
-	//}
 
 	//kernel with heigher weight for near pixels//
 	int anz = 0;
@@ -48,14 +42,12 @@ Mat Dip3::createGaussianKernel(int kSize) {
 			else {
 				powY = y;
 			}
-			//kernel.col(x).row(y) = kernel.col(x).row(y) / (kSize*kSize);
 			kernel.col(x).row(y) = kernel.at<float>(Point(x, y)) * pow(2, powX) * pow(2, powY);
 			anz += pow(2, powX) * pow(2, powY);
 		}
 	}
 	for (int x = 0; x < kSize; x++) {
 		for (int y = 0; y < kSize; y++) {
-			//kernel.col(x).row(y) = kernel.col(x).row(y) / (kSize*kSize);
 			kernel.col(x).row(y) = kernel.at<float>(Point(x, y)) / anz;
 		}
 	}
@@ -96,7 +88,6 @@ Mat Dip3::circShift(Mat& in, int dx, int dy) {
 			else if (currY >= in.rows) {
 				currY = currY % in.rows;
 			}
-			//cout << x << ":" << y << " - " << currX << ":" << currY << endl;
 			in.col(currX).row(currY).copyTo(out.col(x).row(y));
 		}
 	}
@@ -112,130 +103,33 @@ return   output image
 Mat Dip3::frequencyConvolution(Mat& in, Mat& kernel) {
 
 	// TO DO !!!
-	////1. circShift Kernel
-	////cout << kernel << endl;
-	//Mat shiftKernel = circShift(kernel, (kernel.cols - 1) / 2, (kernel.rows - 1) / 2);
-	////shiftKernel.row(0).col(0) = 1;
-	////shiftKernel.row(0).col(1) = 2;
-	////shiftKernel.row(0).col(2) = 3;
-	////shiftKernel.row(1).col(0) = 4;
-	////shiftKernel.row(1).col(1) = 5;
-	////shiftKernel.row(1).col(2) = 6;
-	////shiftKernel.row(2).col(0) = 7;
-	////shiftKernel.row(2).col(1) = 8;
-	////shiftKernel.row(2).col(2) = 9;
+	//1. circShift Kernel
+	//Mat shiftKernel = Mat::zeros(in.rows, in.cols, CV_32F);
+	//repeat(shiftKernel, fKernel.rows / shiftKernel.rows, f;// = circShift(kernel, -((kernel.cols - 1) / 2), -((kernel.rows - 1) / 2));
 
-	////cout << "shiftKernel: " << endl;
-	////cout << shiftKernel << endl ;
-	////2. build Kernel in size of image
+	//2. build Kernel in size of image
+	Mat fKernel = Mat::zeros(in.rows, in.cols, CV_32F);
+	for (int y = 0; y < kernel.rows; y++) {
+		for (int x = 0; x < kernel.cols; x++) {
+			fKernel.col(x).row(y) = kernel.at<float>(Point(x, y));
+		}
+	}
+	fKernel = circShift(fKernel, -((kernel.cols - 1) / 2), -((kernel.rows - 1) / 2));
+	Mat fImage;// = in.clone();
+	in.convertTo(fImage, CV_32F);
 
-	//Mat fKernel = Mat::zeros(in.rows, in.cols, CV_32F);
-	//repeat(shiftKernel, fKernel.rows / shiftKernel.rows, fKernel.cols / shiftKernel.cols, fKernel);
-	//shiftKernel.convertTo(shiftKernel, CV_32F);
-	//Mat fImage;// = in.clone();
-	//in.convertTo(fImage, CV_32F);
-	////cout << "paddedKernel before repeat: " << endl;
-	////cout << paddedKernel << endl;
-	//
-	////cout << "shiftKernel: " << endl;
-	////cout << shiftKernel << endl;
-	////cout << "fKernel: " << endl;
-	////cout << fKernel << endl;
-	////cout << "fImage: " << endl;
-	////cout << fImage << endl;
-	////cout << "paddedKernel after repeat: " << endl;
-	////cout << paddedKernel << endl;
-	////Mat padded;
-	////cout << in << endl;
+	//3. dft of kernel and image
+	dft(fImage, fImage, 0);
+	dft(fKernel, fKernel,0);
 
-	////copyMakeBorder(in, padded, 0, m - in.rows, 0, n - in.cols, BORDER_CONSTANT, Scalar::all(0));
-	////cout << in.rows << "x" << in.cols << endl;
-	////cout << padded << endl;
+	//4. multiply spectrums of kernel and image in frequenzy domain
+	Mat outputImage;
+	mulSpectrums(fImage, fKernel, outputImage, 0);
 
-	////Mat kernelPlanes[] = { Mat_<float>(padded), Mat::zeros(padded.size(), CV_32F) };
-	////Mat imagePlanes[] = { Mat_<float>(padded), Mat::zeros(padded.size(), CV_32F) };
-	////cout << "kernelPlanes: " << endl;
-	////cout << kernelPlanes[0] << endl;
-	////cout << "imagePlanes: " << endl;
-	////cout << imagePlanes[0] << endl;
-	////Mat frequencyKernel;
-	////Mat frequencyImage;
-	////merge(kernelPlanes, 2, frequencyKernel);         // Add to the expanded another plane with zeros
-	////merge(imagePlanes, 2, frequencyImage);
-	////cout << "merged frequencyKernel: " << endl;
-	////cout << frequencyKernel << endl;
+	//5. inverse dft
+	dft(outputImage, outputImage, DFT_INVERSE + DFT_SCALE);
 
-	////dft(frequencyKernel, frequencyKernel);
-	////dft(frequencyImage, frequencyImage);
-	////// compute the magnitude and switch to logarithmic scale
-	////// => log(1 + sqrt(Re(DFT(I))^2 + Im(DFT(I))^2))
-	////split(frequencyKernel, kernelPlanes);            // planes[0] = Re(DFT(I), planes[1] = Im(DFT(I))
-	////magnitude(kernelPlanes[0], kernelPlanes[1], kernelPlanes[0]);// planes[0] = magnitude
-	////Mat magI = kernelPlanes[0];
-	////magI += Scalar::all(1);                    // switch to logarithmic scale
-	////log(magI, magI);
-	////normalize(magI, magI, 0, 1, CV_MINMAX); // Transform the matrix with float values into a
-	////										// viewable image form (float between values 0 and 1).
-
-
-
-
-	////3. dft of kernel and image
-	////int m = getOptimalDFTSize(in.rows);
-	////int n = getOptimalDFTSize(in.cols); // on the border add zero values
-
-	////Mat imagePlanes[] = { Mat_<float>(fImage), Mat::zeros(fImage.size(), CV_32F) };
-	////Mat complexImage;	//Complex plane to contain the DFT coefficients {[0]-Real,[1]-Img}
-	////merge(imagePlanes, 2, complexImage);
-
-	////Mat kernelPlanes[] = { Mat_<float>(fKernel), Mat::zeros(fKernel.size(), CV_32F) };
-	////Mat complexKernel;	//Complex plane to contain the DFT coefficients {[0]-Real,[1]-Img}
-	////merge(kernelPlanes, 2, complexKernel);
-
-	//												  // Reconstructing original imae from the DFT coefficients
-
-	////cout << "paddedKernel: " << endl;
-	////cout << paddedKernel << endl;
-	//dft(fImage, fImage, 0);
-	//dft(fKernel, fKernel,0);
-	////cout << "paddedKernel after fourier: " << endl;
-	////cout << paddedKernel << endl;
-
-	////4. multiply spectrums of kernel and image in frequenzy domain
-	//cout << "fImage: " << endl;
-	//cout << fImage << endl;
-	//cout << "fKernel: " << endl;
-	//cout << fKernel << endl;
-	//Mat outputImage;
-	//mulSpectrums(fImage, fKernel, outputImage, 0);
-	////outputImage = fKernel.mul(fImage);
-	//cout << "result mulSpectrums: " << endl;
-	//cout << outputImage << endl;
-	////outputImage.convertTo(out, CV_8U);
-	////5. inverse dft
-	////fImage.copyTo(outputImage);
-	//dft(outputImage, outputImage, DFT_INVERSE + DFT_SCALE);
-	////idft(outputImage, outputImage, DFT_SCALE | DFT_REAL_OUTPUT); // Applying IDFT
-	//Mat out;
-	//outputImage.convertTo(out, CV_8U);
-
-
-	////cout << "kernel: " << endl;
-	////cout << kernel << endl;
-	////cout << "shift kernel: " << endl;
-	////cout << shiftKernel << endl;
-	////cout << "spectrum kernel: " << endl;
-	////cout << fKernel << endl;
-	////cout << "spectrum image: " << endl;
-	////cout << fImage << endl;
-	////cout << "spectrum result: " << endl;
-	////cout << outputImage << endl;
-
-	//cout << "spatialConvolution: "<<endl;
-	//cout << spatialConvolution(in, shiftKernel)<<endl;
-	//cout << "frequencyConvolution: " << endl;
-	//cout << out << endl;
-return in.clone();//outputImage;
+return outputImage;
 }
 
 //Performes a threshold by multiplication in frequency domain
@@ -250,7 +144,10 @@ Mat threshold(Mat& image, double thresh) {
 	dft(fImage, fImage, DFT_INVERSE + DFT_SCALE);
 	for (int y = 0; y < fImage.rows; y++) {
 		for (int x = 0; x < fImage.cols; x++) {
-			if (fImage.at<float>(Point(x, y)) <= thresh) fImage.row(y).col(x) = 0;
+			if (abs(fImage.at<float>(Point(x, y))) <= thresh) {
+				//fImage.row(y).col(x) = 0;
+				fImage.at<float>(Point(x, y)) = 0;
+			}
 		}
 	}
 	dft(fImage, fImage, 0);
@@ -292,7 +189,7 @@ Mat Dip3::usm(Mat& in, int type, int size, double thresh, double scale) {
 	default:
 		GaussianBlur(in, tmp, Size(floor(size / 2) * 2 + 1, floor(size / 2) * 2 + 1), size / 5., size / 5.);
 	}
-
+	
 	// TO DO !!!
 		/*Smooth : y0 -> y1  
 		2. Subtract : y2 = y0 – y1  
@@ -301,47 +198,45 @@ Mat Dip3::usm(Mat& in, int type, int size, double thresh, double scale) {
 		-> Final(green)*/
 	Mat fImage, fIn;
 	//original image
-	in.convertTo(fIn, CV_32F);
-	dft(fIn, fIn, 0);
+	dft(in, fIn, 0);
 	//smoothed image
-	tmp.convertTo(fImage, CV_32F);
+	fImage = tmp;
 	dft(fImage, fImage, 0);
-	//2. subtract
 
-	//cout << "fIn: " << endl;
-	//cout << fIn << endl;
-	//cout << "fImage: " << endl;
-	//cout << fImage << endl;
+	//2. subtract
 	subtract(fIn, fImage, fImage);
-	//cout << "substract fImage: " << endl;
-	//cout << fImage << endl;
+
 	//3. threshold
 	fImage = threshold(fImage, thresh);
-	//dft(fImage, fImage, DFT_INVERSE + DFT_SCALE);
-	//for (int y = 0; y < fImage.rows; y++) {
-	//	for (int x = 0; x < fImage.cols; x++) {
-	//		if (fImage.at<float>(Point(x, y)) <= thresh) fImage.row(y).col(x) = 0;
-	//	}
-	//}
-	//dft(fImage, fImage, 0);
 	
 	//4. scale
-	fImage = fImage * scale;
-	//cout << "scale fImage: " << endl;
-	//cout << fImage << endl;
+	fImage = fImage * (1/abs(scale)*scale);
+
 	//5. add
-	//fImage += in;
 	add(fImage, fIn, fImage);
-	//cout << "add fImage: " << endl;
-	//cout << fImage << endl;
-	//cin.get();
-	Mat outputImage = in.clone();// Mat::zeros(fImage.rows, fImage.cols, CV_8U);
+	
 	dft(fImage, fImage, DFT_INVERSE + DFT_SCALE);
-	//idft(outputImage, outputImage, DFT_SCALE | DFT_REAL_OUTPUT); // Applying IDFT
-
-	//fImage.convertTo(outputImage, CV_8U);
+	
 	return fImage;
+}
 
+// Build Matrix when jumping over boarder
+// not used, cause result is right, but look bad
+/*
+src:    input image
+kernel:  filter kernel
+return:  image matrix for convolution
+*/
+Mat spatialConvolutionBorderHelper(Mat& src, Mat& kernel, Point2i anchor) {
+	Mat out = Mat::zeros(kernel.cols, kernel.rows, CV_32F);
+	Vec2b vec;
+	for (int y = 0; y < kernel.rows; y++) {
+		for (int x = 0; x < kernel.cols; x++) {
+			vec = (src.cols + (anchor.x - ((kernel.cols-1)/2)+x)%src.cols, src.rows + (anchor.y - ((kernel.rows - 1) / 2) + y) % src.rows);
+			src.col(vec[0]).row(vec[1]).copyTo(out.col(x).row(y));
+		}
+	}
+	return out;
 }
 
 // convolution in spatial domain
@@ -375,16 +270,18 @@ Mat Dip3::spatialConvolution(Mat& src, Mat& kernel) {
 			if (x < (kernel.cols - 1) / 2 || x >= (src.cols - (kernel.cols - 1) / 2) ||
 				y < (kernel.rows - 1) / 2 || y >= (src.rows - (kernel.rows - 1) / 2)) {
 				src.col(x).row(y).copyTo(outputImage.col(x).row(y));
+				//mat1 = spatialConvolutionBorderHelper(src, kernel, Point2i(x,y));
 			}
 			else {
 				mat1 = src(rect);
 				mat2 = mat1.mul(flipKernel);
 				outputImage.col(x).row(y) = mean(mat2)*(kernel.cols*kernel.rows);
 			};
+
 		}
-		cout << ".";
+		//cout << ".";
 	}
-	cout << endl;
+	//cout << endl;
 	return outputImage;
 
 }
