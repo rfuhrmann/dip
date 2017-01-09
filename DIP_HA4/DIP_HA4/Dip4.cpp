@@ -77,7 +77,7 @@ Mat Dip4::inverseFilter(Mat& degraded, Mat& filter){
 	filter.copyTo(fKernel(rect));
 
 	//circ shift the kernel 
-	fKernel = circShift(fKernel, -filter.cols / 2, -filter.rows / 2);
+	fKernel = circShift(fKernel, -floor(filter.cols / 2), -floor(filter.rows / 2));
 
 	//convert to frequency domains
 	dft(degraded, fImage, DFT_COMPLEX_OUTPUT);
@@ -170,7 +170,9 @@ Mat Dip4::wienerFilter(Mat& degraded, Mat& filter, double snr){
 	//convert to spatial domain
 	dft(fImage, outputImage, DFT_INVERSE | DFT_REAL_OUTPUT + DFT_SCALE);
 
-	threshold(outputImage, outputImage, 255, 0, THRESH_TRUNC);
+	//threshold(outputImage, outputImage, 255, 0, THRESH_TRUNC);
+	threshold(outputImage, outputImage, 255, 255, CV_THRESH_TRUNC);
+	threshold(outputImage, outputImage, 0, 0, CV_THRESH_TOZERO);
 	return outputImage;
 }
 
