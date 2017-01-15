@@ -22,36 +22,50 @@ Mat Dip3::createGaussianKernel(int kSize) {
 	}
 
 	//kernel with heigher weight for near pixels//
+	int kernelMid = ((kSize - 1) / 2);
 	int anz = 0;
 	int powX = 0;
 	int powY = 0;
 	Mat kernel = Mat::ones(kSize, kSize, CV_32F);
-	for (int x = 0; x < kSize; x++) {
-		//proof: before or after anchor
-		if (x > ((kSize - 1) / 2)) {
-			powX = x - ((kSize - 1) / 2) - 1;
-		}
-		else {
-			powX = x;
-		}
-		//proof: before or after anchor
-		for (int y = 0; y < kSize; y++) {
-			if (y > ((kSize - 1) / 2)) {
-				powY = y - ((kSize - 1) / 2) - 1;
+
+	//This loop starts in the middle and tend the upper left corner
+	//every value is copied to each quadrant of the kernel
+	// O = n/4 * n/4
+	for (int x = kernelMid; x >= 0; x--) {
+		for (int y = kernelMid; y >= 0; y--) {
+			int tmpVal = pow(2, x) * pow(2, y);
+			//x && y
+			kernel.col(x).row(y) = pow(2, x) * pow(2, y);
+			anz += tmpVal;
+			//-x && y
+			if (kernelMid - x > 0) {
+				kernel.col(x).row(y).copyTo(kernel.col(x + (kernelMid - x) * 2).row(y));
+				anz += tmpVal;
 			}
-			else {
-				powY = y;
+			//x && -y
+			if (kernelMid - y > 0) {
+				kernel.col(x).row(y).copyTo(kernel.col(x).row(y + (kernelMid - y) * 2));
+				anz += tmpVal;
 			}
-			kernel.col(x).row(y) = kernel.at<float>(Point(x, y)) * pow(2, powX) * pow(2, powY);
-			anz += pow(2, powX) * pow(2, powY);
+			//-x && -y
+			if (kernelMid - x > 0 && kernelMid - y > 0) {
+				kernel.col(x).row(y).copyTo(kernel.col(x + (kernelMid - x) * 2).row(y + (kernelMid - y) * 2));
+				anz += tmpVal;
+			}
 		}
 	}
-	for (int x = 0; x < kSize; x++) {
-		for (int y = 0; y < kSize; y++) {
-			kernel.col(x).row(y) = kernel.at<float>(Point(x, y)) / anz;
-		}
-	}
+	cout << "kernel" << endl << kernel << endl;
+	kernel = kernel / anz;
+	cout << "anz: " << anz << endl;
+	cout << "kernel / anz" << endl << kernel << endl;
+	//for (int x = 0; x < kSize; x++) {
+	//	for (int y = 0; y < kSize; y++) {
+
+	//		kernel.col(x).row(y) = (kernel.at<float>(Point(x, y)) / anz);
+	//	}
+	//}
 	return kernel;
+
 }
 
 
@@ -120,7 +134,7 @@ Mat Dip3::frequencyConvolution(Mat& in, Mat& kernel) {
 
 	//3. dft of kernel and image
 	dft(fImage, fImage, 0);
-	dft(fKernel, fKernel,0);
+	dft(fKernel, fKernel, 0);
 
 	//4. multiply spectrums of kernel and image in frequenzy domain
 	Mat outputImage;
@@ -129,7 +143,7 @@ Mat Dip3::frequencyConvolution(Mat& in, Mat& kernel) {
 	//5. inverse dft
 	dft(outputImage, outputImage, DFT_INVERSE + DFT_SCALE);
 
-return outputImage;
+	return outputImage;
 }
 
 //Performes a threshold by multiplication in frequency domain
@@ -158,7 +172,7 @@ Mat threshold(Mat& image, double thresh) {
 /*
 in       the input image
 type     integer defining how convolution for smoothing operation is done
-		 0 <==> spatial domain; 1 <==> frequency domain; 2 <==> seperable filter; 3 <==> integral image
+0 <==> spatial domain; 1 <==> frequency domain; 2 <==> seperable filter; 3 <==> integral image
 size     size of used smoothing kernel
 thresh   minimal intensity difference to perform operation
 scale    scaling of edge enhancement
@@ -189,13 +203,13 @@ Mat Dip3::usm(Mat& in, int type, int size, double thresh, double scale) {
 	default:
 		GaussianBlur(in, tmp, Size(floor(size / 2) * 2 + 1, floor(size / 2) * 2 + 1), size / 5., size / 5.);
 	}
-	
+
 	// TO DO !!!
-		/*Smooth : y0 -> y1  
-		2. Subtract : y2 = y0 – y1  
-		2.5.Scale : ý2 = s * y2  
-		3. Add : y3 = y0 + ý2  
-		-> Final(green)*/
+	/*Smooth : y0 -> y1
+	2. Subtract : y2 = y0 – y1
+	2.5.Scale : ý2 = s * y2
+	3. Add : y3 = y0 + ý2
+	-> Final(green)*/
 	Mat fImage, fIn;
 	//original image
 	dft(in, fIn, 0);
@@ -208,16 +222,17 @@ Mat Dip3::usm(Mat& in, int type, int size, double thresh, double scale) {
 
 	//3. threshold
 	fImage = threshold(fImage, thresh);
-	
+
 	//4. scale
-	fImage = fImage * (1/abs(scale)*scale);
+	fImage = fImage * (1 / abs(scale)*scale);
 
 	//5. add
 	add(fImage, fIn, fImage);
-	
+
 	dft(fImage, fImage, DFT_INVERSE + DFT_SCALE);
-	
+
 	return fImage;
+
 }
 
 // Build Matrix when jumping over boarder
@@ -232,7 +247,7 @@ Mat spatialConvolutionBorderHelper(Mat& src, Mat& kernel, Point2i anchor) {
 	Vec2b vec;
 	for (int y = 0; y < kernel.rows; y++) {
 		for (int x = 0; x < kernel.cols; x++) {
-			vec = (src.cols + (anchor.x - ((kernel.cols-1)/2)+x)%src.cols, src.rows + (anchor.y - ((kernel.rows - 1) / 2) + y) % src.rows);
+			vec = (src.cols + (anchor.x - ((kernel.cols - 1) / 2) + x) % src.cols, src.rows + (anchor.y - ((kernel.rows - 1) / 2) + y) % src.rows);
 			src.col(vec[0]).row(vec[1]).copyTo(out.col(x).row(y));
 		}
 	}
@@ -283,7 +298,6 @@ Mat Dip3::spatialConvolution(Mat& src, Mat& kernel) {
 	}
 	//cout << endl;
 	return outputImage;
-
 }
 
 // convolution in spatial domain by seperable filters
@@ -315,14 +329,14 @@ Mat Dip3::satFilter(Mat& src, int size) {
 }
 
 /* *****************************
-  GIVEN FUNCTIONS
+GIVEN FUNCTIONS
 ***************************** */
 
 // function calls processing function
 /*
 in       input image
 type     integer defining how convolution for smoothing operation is done
-		 0 <==> spatial domain; 1 <==> frequency domain
+0 <==> spatial domain; 1 <==> frequency domain
 size     size of used smoothing kernel
 thresh   minimal intensity difference to perform operation
 scale    scaling of edge enhancement
@@ -415,17 +429,17 @@ void Dip3::test_frequencyConvolution(void) {
 		cout << "ERROR: Dip3::frequencyConvolution(): Convolution result contains too large/small values!" << endl;
 		return;
 	}
-	float ref[9][9] = { {0, 0, 0, 0, 0, 0, 0, 0, 0},
-					   {0, 1, 1, 1, 1, 1, 1, 1, 0},
-					   {0, 1, 1, 1, 1, 1, 1, 1, 0},
-					   {0, 1, 1, (8 + 255) / 9., (8 + 255) / 9., (8 + 255) / 9., 1, 1, 0},
-					   {0, 1, 1, (8 + 255) / 9., (8 + 255) / 9., (8 + 255) / 9., 1, 1, 0},
-					   {0, 1, 1, (8 + 255) / 9., (8 + 255) / 9., (8 + 255) / 9., 1, 1, 0},
-					   {0, 1, 1, 1, 1, 1, 1, 1, 0},
-					   {0, 1, 1, 1, 1, 1, 1, 1, 0},
-					   {0, 0, 0, 0, 0, 0, 0, 0, 0} };
-	for (int y = 1; y < 8; y++) {
-		for (int x = 1; x < 8; x++) {
+	float ref[9][9] = { { 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+	{ 0, 1, 1, 1, 1, 1, 1, 1, 0 },
+	{ 0, 1, 1, 1, 1, 1, 1, 1, 0 },
+	{ 0, 1, 1, (8 + 255) / 9., (8 + 255) / 9., (8 + 255) / 9., 1, 1, 0 },
+	{ 0, 1, 1, (8 + 255) / 9., (8 + 255) / 9., (8 + 255) / 9., 1, 1, 0 },
+	{ 0, 1, 1, (8 + 255) / 9., (8 + 255) / 9., (8 + 255) / 9., 1, 1, 0 },
+	{ 0, 1, 1, 1, 1, 1, 1, 1, 0 },
+	{ 0, 1, 1, 1, 1, 1, 1, 1, 0 },
+	{ 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
+	for (int y = 1; y<8; y++) {
+		for (int x = 1; x<8; x++) {
 			if (abs(output.at<float>(y, x) - ref[y][x]) > 0.0001) {
 				cout << "ERROR: Dip3::frequencyConvolution(): Convolution result contains wrong values!" << endl;
 				return;
