@@ -55,20 +55,6 @@ return   :  restorated output image
 Mat Dip4::inverseFilter(Mat& degraded, Mat& filter){
 	// TO DO !!!
 
-	//Rect rect(4, 4, 4, 4);
-	////cout << "rect1" << fKernel(rect) << endl;
-	////for (int y = 0; y < fKernel.rows; y++) {
-	////	for (int x = 0; x < fKernel.cols; x++) {
-	////		if (abs(fKernel.at<float>(Point(x, y))) < t) {
-	////			fKernel.at<float>(Point(x, y)) =  1 / t;
-	////		}
-	////		else {
-	////			fKernel.col(x).row(y) = 1 / (fKernel.at<float>(Point(x, y)));
-	////		}
-	////	}
-	////}
-	////cout << "rect2" << fKernel(rect) << endl;
-
 	Mat fImage, fKernel, outputImage;
 
 	//copy kernel to large matrix (the size of input image)
