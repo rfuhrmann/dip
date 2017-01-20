@@ -13,56 +13,75 @@
 // uses structure tensor to define interest points (foerstner)
 void Dip5::getInterestPoints(Mat& img, double sigma, vector<KeyPoint>& points){
 	// TO DO !!!
-	cout << "Interest Points calculation" << endl;
 
-	cout << "initialize stuff" << endl;
-	Mat gauss = img.clone(); //= createGaussianKernel(2 * sigma);
-	GaussianBlur(img, gauss, Size(0,0), sigma, sigma, 4);
-	Mat devXK = createFstDevKernel(sigma);
-	Mat devYK;
-	transpose(devXK, devYK);
+	//Mat gauss = img.clone(); //= createGaussianKernel(2 * sigma);
+	//GaussianBlur(img, gauss, Size(0,0), sigma, sigma, 4);
+	Mat fstDevKernelX = createFstDevKernel(sigma);
+	Mat fstDevKernelY;
+	transpose(fstDevKernelX, fstDevKernelY);
 
-
-	cout << "calculate the x- and y-gradients" << endl;
-	//Mat gradX = spatialConvolution(img, devXK);
-	//Mat gradY = spatialConvolution(img, devYK);
+	//1. gradients in x and y direction
 	Mat gradX, gradY, gradXY;
-	filter2D(img, gradX, -1, devXK, Point(-1, -1), NULL, 4);
-	filter2D(img, gradY, -1, devYK, Point(-1, -1), NULL, 4);
+	filter2D(img, gradX, -1, fstDevKernelX);// , Point(-1, -1), NULL, 4);
+	filter2D(img, gradY, -1, fstDevKernelY);// , Point(-1, -1), NULL, 4);
 
+	//2. gx*gx, gy*gy, gx*gy
 	multiply(gradX, gradY, gradXY);
-	showImage(gradXY, "Gradients: gx * gy", 0, true, false);
-	
 	pow(gradX, 2, gradX);
 	pow(gradY, 2, gradY);
-	Mat trace, determinant, weight, isotropy;
+	
+
+	//3. average (gaussian window)
+	GaussianBlur(gradXY, gradXY, Size(3, 3), 1);
+	showImage(gradXY, "Gradients: gx * gy", 0, true, false);
+	
+	//4. trace of structure tensor
+	Mat trace, weight, isotropy;
 	add(gradX, gradY, trace);
 	showImage(trace, "Trace", 0, true, false);
+	
+	//5. determinant of structure tensor
+	Mat determinant, tmpDet;
 	multiply(gradX, gradY, determinant);
+	//multiply(gradXY, gradXY, tmpDet);
+	//subtract(determinant, tmpDet, determinant);
 	showImage(determinant, "Determinant", 0, true, false);
+
+	//6. weight
 	divide(determinant, trace, weight);
 	showImage(weight, "Weight", 0, true, false);
-	nonMaxSuppression(weight);
+
+	//7. weight non-max suppression
+	float avgWeight = 0.5*mean(weight)[0];
+	weight = nonMaxSuppression(weight);
 	showImage(weight, "Weight - nonMaxSuppression", 0, true, false);
 
-	//WEIGHT TRASHOLDING
+	//8. weight thresholding
+	threshold(weight, weight, avgWeight, 1, THRESH_TOZERO);
+	showImage(weight, "Weight - threshold", 0, true, false);
 
-	multiply(weight, 4, weight);
+	//9. isotropy
 	pow(trace, 2, trace);
-	divide(weight, trace, isotropy);
+	//multiply(trace, trace, trace);
+	divide(4 * determinant, trace, isotropy);
 	showImage(isotropy, "Isotropy", 0, true, false);
-	nonMaxSuppression(isotropy);
+
+	//10. isotropy non-max suppression
+	isotropy = nonMaxSuppression(isotropy);
 	showImage(isotropy, "Isotropy - nonMaxSuppression", 0, true, false);
 
-	//ISOTROPY TRASHOLDING
+	//11. isotropy thresholding
+	//threshold(isotropy, isotropy, 0.5, 255, THRESH_TOZERO);
+	//showImage(isotropy, "Isotropy - threshold", 0, true, false);
 
-	const float wMin = 70.0; // 0.5 ... 1.5
-	const float qMin = 0.5; // 0.5 ... 0.75
-	const float wMinActual = wMin * mean(weight)[0];
+	//12. kepoints found
+	const float minWeight = 0.5; // 0.5 ... 1.5
+	const float minIsotropy = 0.5; // 0.5 ... 0.75
+	avgWeight = avgWeight / fstDevKernelX.rows * fstDevKernelX.cols;
 	for (int x = 0; x < img.rows; ++x) {
 		for (int y = 0; y < img.cols; ++y) {
-			if ((isotropy.at<float>(x, y) >= qMin)
-				&& (weight.at<float>(x, y) >= wMinActual))
+			if ((isotropy.at<float>(x, y) >= minIsotropy)
+				&& (weight.at<float>(x, y) >= avgWeight))
 			{
 				KeyPoint kp;
 				kp.pt.x = y;
@@ -74,90 +93,6 @@ void Dip5::getInterestPoints(Mat& img, double sigma, vector<KeyPoint>& points){
 			}
 		}
 	}
-
-	//Mat gXX;
-	//Mat gYY;
-	//Mat gXY;
-	//multiply(gradX, gradY, gXY);
-	//multiply(gradX, gradX, gXX);
-	//multiply(gradY, gradY, gYY);
-
-	////Mat gXXs = spatialConvolution(gXX, gauss);
-	////Mat gYYs = spatialConvolution(gYY, gauss);
-	////Mat gXYs = spatialConvolution(gXY, gauss);
-	//Mat gXXs, gYYs, gXYs;
-	//filter2D(gauss, gXXs, -1, gXX, Point(-1, -1), NULL, 4);
-	//filter2D(gauss, gYYs, -1, gYY, Point(-1, -1), NULL, 4);
-	//filter2D(gauss, gXYs, -1, gXY, Point(-1, -1), NULL, 4);
-
-	//cout << "calculate the trace" << endl;
-	//// see DIP05_ST13_interest.pdf page 22
-	//Mat trace, traceX, traceY;
-	//add(gXXs, gYYs, trace);
-	//
-	////test
-	//pow(gXXs, 2, traceX);
-	//pow(gYYs, 2, traceY);
-	//add(traceX, traceY, traceX);
-	////pow(trace, 2, traceX);
-	//showImage(traceX, "Trace", 0, true, false);
-
-	//cout << "calculate the determinant" << endl;
-	//// see DIP05_ST13_interest.pdf page 22
-	//Mat det;
-	//Mat temp;
-	//multiply(gXXs, gYYs, det);
-	//multiply(gXYs, gXYs, temp);
-	//subtract(det, temp, det);
-
-	//showImage(det, "Determinant", 0, true, false);
-
-	//cout << "calculate the weight" << endl;
-	//// Strength of gradients in the neighborhood
-	//// see DIP05_ST13_interest.pdf page 22
-	//Mat w;
-	//divide(det, trace, w);
-
-	//showImage(w, "Weight", 0, true, false);
-
-	//Mat wNoMax;
-	////nonMaxSuppression(w, wNoMax);
-	//nonMaxSuppression(w);
-	//w.copyTo(wNoMax);
-	//cout << "calculate the isotropy" << endl;
-	//// Measures the uniformity of gradient directions in the neighbourhood
-	//// see DIP05_ST13_interest.pdf page 22
-	//multiply(trace, trace, temp);
-	//Mat q;
-	//divide(4 * det, temp, q);
-	//Mat qNoMax;
-	////nonMaxSuppression(q, qNoMax);
-	//nonMaxSuppression(temp);
-	//temp.copyTo(qNoMax);
-
-	//showImage(qNoMax, "Isotropy", 0, true, false);
-
-	//cout << "do the thresholding" << endl;
-	//// XXX why do we have to choose wMin so high?
-	//const float wMin = 70.0; // 0.5 ... 1.5
-	//const float qMin = 0.5; // 0.5 ... 0.75
-	//const float wMinActual = wMin * mean(wNoMax)[0];
-	//for (int x = 0; x < img.rows; ++x) {
-	//	for (int y = 0; y < img.cols; ++y) {
-	//		if ((qNoMax.at<float>(x, y) >= qMin)
-	//			&& (wNoMax.at<float>(x, y) >= wMinActual))
-	//		{
-	//			KeyPoint kp;
-	//			kp.pt.x = y;
-	//			kp.pt.y = x;
-	//			kp.angle = 0;
-	//			kp.size = 3;
-	//			kp.response = wNoMax.at<float>(x, y);
-	//			points.push_back(kp);
-	//		}
-	//	}
-	//}
-	//showImage(img, "keypoints", 0, true, false);
 }
 
 // creates kernel representing fst derivative of a Gaussian kernel in x-direction
@@ -167,33 +102,52 @@ return	the calculated kernel
 */
 Mat Dip5::createFstDevKernel(double sigma){
 	// TO DO !!!
-	const int kSize = (((int)ceil(sigma * 3.0)) * 2) + 1;
-	Mat kernel(1, kSize, CV_32FC1);
+	//const int kSize = (((int)ceil(sigma * 3.0)) * 2) + 1;
+	//Mat kernel(1, kSize, CV_32FC1);
+	////Mat kernel = Mat::zeros(kSize, kSize, CV_32FC1);
+	//for (int x = 0; x < kernel.rows; ++x) {
+	//	const float xv = x - (kernel.rows / 2);
+	//	for (int y = 0; y < kernel.cols; ++y) {
+	//		const float yv = y - (kernel.cols / 2);
+	//		const float commonFac = exp(-(xv*xv + yv*yv) / 2 * sigma * sigma) / (2 * M_PI * sigma * sigma * sigma * sigma);
+	//		if (kernel.type() == CV_32FC2) {
+	//			kernel.at<Vec2f>(x, y)[0] = -xv * commonFac; // partial derivative towards x
+	//			kernel.at<Vec2f>(x, y)[1] = -yv * commonFac; // partial derivative towards y
+	//		}
+	//		else {
+	//			kernel.at<float>(x, y) = -yv * commonFac; // partial derivative towards y
+	//		}
+	//	}
+	//}
+	//return kernel;
 
-	const int w = kernel.rows;
-	const int h = kernel.cols;
-	const float sigmaSqr = sigma * sigma;
-	const float sigma22 = 2 * sigmaSqr;
-	const float sigma4Pi = 2 * M_PI * sigmaSqr * sigmaSqr;
-	const float hw = (w / 2);
-	const float hh = (h / 2);
-	for (int x = 0; x < w; ++x) {
-		const float xv = x - hw;
-		for (int y = 0; y < h; ++y) {
-			const float yv = y - hh;
-			const float commonFac = exp(-(xv*xv + yv*yv) / sigma22) / sigma4Pi;
-
-			// see DIP05_ST13_interest.pdf page 10
-			if (kernel.type() == CV_32FC2) {
-				kernel.at<Vec2f>(x, y)[0] = -xv * commonFac; // partial derivative towards x
-				kernel.at<Vec2f>(x, y)[1] = -yv * commonFac; // partial derivative towards y
-			}
-			else {
-				kernel.at<float>(x, y) = -yv * commonFac; // partial derivative towards y
-			}
+	sigma = this->sigma;
+	int kernelSize = (int)ceil(3 * this->sigma);
+	kernelSize += 1 - kernelSize % 2;
+	Mat gaussianKernelX = getGaussianKernel(kernelSize, sigma, CV_32FC1);
+	Mat gaussianKernelY = getGaussianKernel(kernelSize, sigma, CV_32FC1);
+	Mat gaussianKernel = gaussianKernelX*gaussianKernelY.t();
+	Mat fstKernel = Mat::ones(kernelSize, kernelSize, CV_32FC1);
+	for (int x = 0; x<kernelSize; x++) {
+		for (int y = 0; y<kernelSize; y++) {
+			int rx = x - kernelSize / 2;
+			fstKernel.at<float>(x, y) = -rx*gaussianKernel.at<float>(x, y) / sigma / sigma;
 		}
 	}
-	return kernel;//Mat::zeros(3, 3, CV_32FC1);
+	return fstKernel;
+
+	//int kSize = round(sigma * 3) * 2 - 1;
+	//kSize += 1 - kSize % 2;
+	//Mat gaussKernel = getGaussianKernel(kSize, sigma, CV_32FC1);
+	//gaussKernel = gaussKernel * gaussKernel.t();
+	//Mat fstKernel = Mat::zeros(kSize, kSize, CV_32FC1);
+	//for (int x = 0; x < kSize; x++) {
+	//	for (int y = 0; y < kSize; y++) {
+	//		fstKernel.at<float>(x, y) = (-(x - kSize / 2) / (sigma*sigma))*gaussKernel.at<float>(x, y);
+	//		//fstKernel.at<float>(x, y) = (-(x - 1) / (sigma*sigma))*gaussKernel.at<float>(x, y);
+	//	}
+	//}
+	//return fstKernel;
 }
 
 /* *****************************
