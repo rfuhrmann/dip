@@ -13,12 +13,8 @@
 // uses structure tensor to define interest points (foerstner)
 void Dip5::getInterestPoints(Mat& img, double sigma, vector<KeyPoint>& points){
 	// TO DO !!!
-
-	//Mat gauss = img.clone(); //= createGaussianKernel(2 * sigma);
-	//GaussianBlur(img, gauss, Size(0,0), sigma, sigma, 4);
 	Mat fstDevKernelX = createFstDevKernel(sigma);
-	Mat fstDevKernelY;
-	transpose(fstDevKernelX, fstDevKernelY);
+	Mat fstDevKernelY = fstDevKernelX.t();
 
 	//1. gradients in x and y direction
 	Mat gradX, gradY, gradXY;
@@ -32,63 +28,57 @@ void Dip5::getInterestPoints(Mat& img, double sigma, vector<KeyPoint>& points){
 	
 
 	//3. average (gaussian window)
-	GaussianBlur(gradXY, gradXY, Size(3, 3), 1);
-	showImage(gradXY, "Gradients: gx * gy", 0, true, false);
+	GaussianBlur(gradXY, gradXY, Size(3, 3), sigma);
+	//showImage(gradXY, "Gradients: gx * gy", 0, true, false);
 	
 	//4. trace of structure tensor
-	Mat trace, weight, isotropy;
+	Mat trace, isotropy;
 	add(gradX, gradY, trace);
-	showImage(trace, "Trace", 0, true, false);
+	//showImage(trace, "Trace", 0, true, false);
 	
 	//5. determinant of structure tensor
-	Mat determinant, tmpDet;
+	Mat determinant;
 	multiply(gradX, gradY, determinant);
-	//multiply(gradXY, gradXY, tmpDet);
-	//subtract(determinant, tmpDet, determinant);
-	showImage(determinant, "Determinant", 0, true, false);
+	//showImage(determinant, "Determinant", 0, true, false);
 
 	//6. weight
+	Mat weight;
 	divide(determinant, trace, weight);
-	showImage(weight, "Weight", 0, true, false);
+	////showImage(weight, "Weight", 0, true, false);
 
 	//7. weight non-max suppression
 	float avgWeight = 0.5*mean(weight)[0];
 	weight = nonMaxSuppression(weight);
-	showImage(weight, "Weight - nonMaxSuppression", 0, true, false);
+	//showImage(weight, "Weight - nonMaxSuppression", 0, true, false);
 
 	//8. weight thresholding
 	threshold(weight, weight, avgWeight, 1, THRESH_TOZERO);
-	showImage(weight, "Weight - threshold", 0, true, false);
+	//showImage(weight, "Weight - threshold", 0, true, false);
 
 	//9. isotropy
 	pow(trace, 2, trace);
-	//multiply(trace, trace, trace);
 	divide(4 * determinant, trace, isotropy);
-	showImage(isotropy, "Isotropy", 0, true, false);
+	//showImage(isotropy, "Isotropy", 0, true, false);
 
 	//10. isotropy non-max suppression
 	isotropy = nonMaxSuppression(isotropy);
-	showImage(isotropy, "Isotropy - nonMaxSuppression", 0, true, false);
+	//showImage(isotropy, "Isotropy - nonMaxSuppression", 0, true, false);
 
 	//11. isotropy thresholding
-	//threshold(isotropy, isotropy, 0.5, 255, THRESH_TOZERO);
-	//showImage(isotropy, "Isotropy - threshold", 0, true, false);
-
 	//12. kepoints found
-	const float minWeight = 0.5; // 0.5 ... 1.5
-	const float minIsotropy = 0.5; // 0.5 ... 0.75
-	avgWeight = avgWeight / fstDevKernelX.rows * fstDevKernelX.cols;
+	const float minWeight = 0.01;
+	const float minIsotropy = 0.5;
 	for (int x = 0; x < img.rows; ++x) {
 		for (int y = 0; y < img.cols; ++y) {
 			if ((isotropy.at<float>(x, y) >= minIsotropy)
-				&& (weight.at<float>(x, y) >= avgWeight))
+				&& (weight.at<float>(x, y) >= minWeight))
 			{
 				KeyPoint kp;
 				kp.pt.x = y;
 				kp.pt.y = x;
-				kp.angle = 0;
 				kp.size = 3;
 				kp.response = weight.at<float>(x, y);
+				cout << "kp" << kp.response<< endl;
 				points.push_back(kp);
 			}
 		}
@@ -102,52 +92,32 @@ return	the calculated kernel
 */
 Mat Dip5::createFstDevKernel(double sigma){
 	// TO DO !!!
-	//const int kSize = (((int)ceil(sigma * 3.0)) * 2) + 1;
-	//Mat kernel(1, kSize, CV_32FC1);
-	////Mat kernel = Mat::zeros(kSize, kSize, CV_32FC1);
-	//for (int x = 0; x < kernel.rows; ++x) {
-	//	const float xv = x - (kernel.rows / 2);
-	//	for (int y = 0; y < kernel.cols; ++y) {
-	//		const float yv = y - (kernel.cols / 2);
-	//		const float commonFac = exp(-(xv*xv + yv*yv) / 2 * sigma * sigma) / (2 * M_PI * sigma * sigma * sigma * sigma);
-	//		if (kernel.type() == CV_32FC2) {
-	//			kernel.at<Vec2f>(x, y)[0] = -xv * commonFac; // partial derivative towards x
-	//			kernel.at<Vec2f>(x, y)[1] = -yv * commonFac; // partial derivative towards y
-	//		}
-	//		else {
-	//			kernel.at<float>(x, y) = -yv * commonFac; // partial derivative towards y
-	//		}
-	//	}
-	//}
-	//return kernel;
-
 	sigma = this->sigma;
-	int kernelSize = (int)ceil(3 * this->sigma);
-	kernelSize += 1 - kernelSize % 2;
-	Mat gaussianKernelX = getGaussianKernel(kernelSize, sigma, CV_32FC1);
-	Mat gaussianKernelY = getGaussianKernel(kernelSize, sigma, CV_32FC1);
-	Mat gaussianKernel = gaussianKernelX*gaussianKernelY.t();
-	Mat fstKernel = Mat::ones(kernelSize, kernelSize, CV_32FC1);
-	for (int x = 0; x<kernelSize; x++) {
-		for (int y = 0; y<kernelSize; y++) {
-			int rx = x - kernelSize / 2;
-			fstKernel.at<float>(x, y) = -rx*gaussianKernel.at<float>(x, y) / sigma / sigma;
+	int kSize = (int)ceil(3 * this->sigma);
+	kSize += 1 - kSize % 2;
+	//int kSize = (((int)ceil(sigma * 3.0)) * 2) + 1;
+	Mat gaussianKernel = getGaussianKernel(kSize, sigma, CV_32FC1);
+	gaussianKernel = gaussianKernel * gaussianKernel.t();
+	Mat fstKernel = Mat::ones(kSize, kSize, CV_32FC1);
+	for (int x = 0; x<kSize; x++) {
+		for (int y = 0; y<kSize; y++) {
+			/*int rx = x - kSize / 2;*/
+			fstKernel.at<float>(x, y) = -(x - kSize / 2 )*gaussianKernel.at<float>(x, y) / (sigma * sigma);
 		}
 	}
-	return fstKernel;
+	//Sobel
+	//fstKernel.at<float>(0, 0) = 1;
+	//fstKernel.at<float>(1, 0) = 2;
+	//fstKernel.at<float>(2, 0) = 1;
+	//fstKernel.at<float>(0, 1) = 0;
+	//fstKernel.at<float>(1, 1) = 0;
+	//fstKernel.at<float>(2, 1) = 0;
+	//fstKernel.at<float>(0, 2) = -1;
+	//fstKernel.at<float>(1, 2) = -2;
+	//fstKernel.at<float>(2, 2) = -1;
 
-	//int kSize = round(sigma * 3) * 2 - 1;
-	//kSize += 1 - kSize % 2;
-	//Mat gaussKernel = getGaussianKernel(kSize, sigma, CV_32FC1);
-	//gaussKernel = gaussKernel * gaussKernel.t();
-	//Mat fstKernel = Mat::zeros(kSize, kSize, CV_32FC1);
-	//for (int x = 0; x < kSize; x++) {
-	//	for (int y = 0; y < kSize; y++) {
-	//		fstKernel.at<float>(x, y) = (-(x - kSize / 2) / (sigma*sigma))*gaussKernel.at<float>(x, y);
-	//		//fstKernel.at<float>(x, y) = (-(x - 1) / (sigma*sigma))*gaussKernel.at<float>(x, y);
-	//	}
-	//}
-	//return fstKernel;
+	//cout << fstKernel << endl;
+	return fstKernel;
 }
 
 /* *****************************
