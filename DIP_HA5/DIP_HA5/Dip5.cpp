@@ -29,40 +29,40 @@ void Dip5::getInterestPoints(Mat& img, double sigma, vector<KeyPoint>& points){
 
 	//3. average (gaussian window)
 	GaussianBlur(gradXY, gradXY, Size(3, 3), sigma);
-	//showImage(gradXY, "Gradients: gx * gy", 0, true, false);
+	showImage(gradXY, "3. Gradients gx x gy", 0, true, true);
 	
 	//4. trace of structure tensor
 	Mat trace, isotropy;
 	add(gradX, gradY, trace);
-	//showImage(trace, "Trace", 0, true, false);
+	showImage(trace, "4. Trace", 0, true, true);
 	
 	//5. determinant of structure tensor
 	Mat determinant;
 	multiply(gradX, gradY, determinant);
-	//showImage(determinant, "Determinant", 0, true, false);
+	showImage(determinant, "5. Determinant", 0, true, true);
 
 	//6. weight
 	Mat weight;
 	divide(determinant, trace, weight);
-	////showImage(weight, "Weight", 0, true, false);
+	showImage(weight, "6. Weight", 0, true, true);
 
 	//7. weight non-max suppression
 	float avgWeight = 0.5*mean(weight)[0];
 	weight = nonMaxSuppression(weight);
-	//showImage(weight, "Weight - nonMaxSuppression", 0, true, false);
+	showImage(weight, "7. Weight - nonMaxSuppression", 0, true, true);
 
 	//8. weight thresholding
 	threshold(weight, weight, avgWeight, 1, THRESH_TOZERO);
-	//showImage(weight, "Weight - threshold", 0, true, false);
+	showImage(weight, "8. Weight - threshold", 0, true, true);
 
 	//9. isotropy
 	pow(trace, 2, trace);
 	divide(4 * determinant, trace, isotropy);
-	//showImage(isotropy, "Isotropy", 0, true, false);
+	showImage(isotropy, "9. Isotropy", 0, true, true);
 
 	//10. isotropy non-max suppression
 	isotropy = nonMaxSuppression(isotropy);
-	//showImage(isotropy, "Isotropy - nonMaxSuppression", 0, true, false);
+	showImage(isotropy, "10. Isotropy - nonMaxSuppression", 0, true, true);
 
 	//11. isotropy thresholding
 	//12. kepoints found
@@ -78,7 +78,7 @@ void Dip5::getInterestPoints(Mat& img, double sigma, vector<KeyPoint>& points){
 				kp.pt.y = x;
 				kp.size = 3;
 				kp.response = weight.at<float>(x, y);
-				cout << "kp" << kp.response<< endl;
+				//cout << "kp" << kp.response<< endl;
 				points.push_back(kp);
 			}
 		}
@@ -92,10 +92,8 @@ return	the calculated kernel
 */
 Mat Dip5::createFstDevKernel(double sigma){
 	// TO DO !!!
-	sigma = this->sigma;
-	int kSize = (int)ceil(3 * this->sigma);
+	int kSize = (int)ceil(3 * sigma);
 	kSize += 1 - kSize % 2;
-	//int kSize = (((int)ceil(sigma * 3.0)) * 2) + 1;
 	Mat gaussianKernel = getGaussianKernel(kSize, sigma, CV_32FC1);
 	gaussianKernel = gaussianKernel * gaussianKernel.t();
 	Mat fstKernel = Mat::ones(kSize, kSize, CV_32FC1);
@@ -107,13 +105,13 @@ Mat Dip5::createFstDevKernel(double sigma){
 	}
 	//Sobel
 	//fstKernel.at<float>(0, 0) = 1;
-	//fstKernel.at<float>(1, 0) = 2;
-	//fstKernel.at<float>(2, 0) = 1;
-	//fstKernel.at<float>(0, 1) = 0;
+	//fstKernel.at<float>(0, 1) = 2;
+	//fstKernel.at<float>(0, 2) = 1;
+	//fstKernel.at<float>(1, 0) = 0;
 	//fstKernel.at<float>(1, 1) = 0;
-	//fstKernel.at<float>(2, 1) = 0;
-	//fstKernel.at<float>(0, 2) = -1;
-	//fstKernel.at<float>(1, 2) = -2;
+	//fstKernel.at<float>(1, 2) = 0;
+	//fstKernel.at<float>(2, 0) = -1;
+	//fstKernel.at<float>(2, 1) = -2;
 	//fstKernel.at<float>(2, 2) = -1;
 
 	//cout << fstKernel << endl;
