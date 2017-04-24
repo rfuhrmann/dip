@@ -223,38 +223,6 @@ Mat Dip2::averageFilter(Mat& src, int kSize){
 		}
 	}
 	
-	/* //kernel with heigher weight for near pixels//
-	int anz = 0;
-	int powX = 0;
-	int powY = 0;
-	Mat kernel = Mat::ones(kSize, kSize, CV_32F);
-	for (int x = 0; x < kSize; x++) {
-		if (x >((kSize - 1) / 2)) {
-			powX = x - ((kSize - 1) / 2) - 1;
-		}
-		else {
-			powX = x;
-		}
-		for (int y = 0; y < kSize; y++) {
-			if (y >((kSize - 1) / 2)) {
-				powY = y - ((kSize - 1) / 2) - 1;
-			}
-			else {
-				powY = y;
-			}
-			//kernel.col(x).row(y) = kernel.col(x).row(y) / (kSize*kSize);
-			kernel.col(x).row(y) = kernel.at<float>(Point(x, y)) * pow(2, powX) * pow(2, powY);
-			anz += pow(2, powX) * pow(2, powY);
-		}
-	}
-	for (int x = 0; x < kSize; x++) {
-		for (int y = 0; y < kSize; y++) {
-			//kernel.col(x).row(y) = kernel.col(x).row(y) / (kSize*kSize);
-			kernel.col(x).row(y) = kernel.col(x).row(y) / anz;
-		}
-	}
-	*/
-
 	Mat outputImage = spatialConvolution(src, kernel);
    return outputImage;
 }

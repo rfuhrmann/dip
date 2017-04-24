@@ -10,6 +10,12 @@
 #include "Dip5.h"
 #include <math.h>
 
+int getKernelSize(double sigma) {
+	int kernelSize = (int)ceil(3 * sigma);
+	kernelSize += 1 - kernelSize % 2;
+	return kernelSize;
+}
+
 // uses structure tensor to define interest points (foerstner)
 void Dip5::getInterestPoints(Mat& img, double sigma, vector<KeyPoint>& points){
 	// TO DO !!!
@@ -25,10 +31,14 @@ void Dip5::getInterestPoints(Mat& img, double sigma, vector<KeyPoint>& points){
 	multiply(gradX, gradY, gradXY);
 	pow(gradX, 2, gradX);
 	pow(gradY, 2, gradY);
-	
 
 	//3. average (gaussian window)
-	GaussianBlur(gradXY, gradXY, Size(3, 3), sigma);
+	int kSize = getKernelSize(sigma);
+	Size gSize = Size(kSize, kSize);
+
+	GaussianBlur(gradX, gradX, gSize, sigma);
+	GaussianBlur(gradY, gradY, gSize, sigma);
+	GaussianBlur(gradXY, gradXY, gSize, sigma);
 	showImage(gradXY, "3. Gradients gx x gy", 0, true, true);
 	
 	//4. trace of structure tensor
@@ -39,6 +49,8 @@ void Dip5::getInterestPoints(Mat& img, double sigma, vector<KeyPoint>& points){
 	//5. determinant of structure tensor
 	Mat determinant;
 	multiply(gradX, gradY, determinant);
+	pow(gradXY, 2, gradXY);
+	determinant = determinant - gradXY;
 	showImage(determinant, "5. Determinant", 0, true, true);
 
 	//6. weight
@@ -47,7 +59,7 @@ void Dip5::getInterestPoints(Mat& img, double sigma, vector<KeyPoint>& points){
 	showImage(weight, "6. Weight", 0, true, true);
 
 	//7. weight non-max suppression
-	float avgWeight = 0.5*mean(weight)[0];
+	float avgWeight = 1.5*mean(weight)[0];
 	weight = nonMaxSuppression(weight);
 	showImage(weight, "7. Weight - nonMaxSuppression", 0, true, true);
 
@@ -76,9 +88,8 @@ void Dip5::getInterestPoints(Mat& img, double sigma, vector<KeyPoint>& points){
 				KeyPoint kp;
 				kp.pt.x = y;
 				kp.pt.y = x;
-				kp.size = 3;
+				kp.size = 5;
 				kp.response = weight.at<float>(x, y);
-				//cout << "kp" << kp.response<< endl;
 				points.push_back(kp);
 			}
 		}
@@ -92,31 +103,21 @@ return	the calculated kernel
 */
 Mat Dip5::createFstDevKernel(double sigma){
 	// TO DO !!!
-	int kSize = (int)ceil(3 * sigma);
-	kSize += 1 - kSize % 2;
+
+	int kSize = getKernelSize(sigma);
 	Mat gaussianKernel = getGaussianKernel(kSize, sigma, CV_32FC1);
+	cout << gaussianKernel << endl;
 	gaussianKernel = gaussianKernel * gaussianKernel.t();
 	Mat fstKernel = Mat::ones(kSize, kSize, CV_32FC1);
 	for (int x = 0; x<kSize; x++) {
 		for (int y = 0; y<kSize; y++) {
-			/*int rx = x - kSize / 2;*/
-			fstKernel.at<float>(x, y) = -(x - kSize / 2 )*gaussianKernel.at<float>(x, y) / (sigma * sigma);
+			fstKernel.at<float>(y, x) = -(x - kSize / 2 )*gaussianKernel.at<float>(x, y) / (sigma * sigma);
 		}
 	}
-	//Sobel
-	//fstKernel.at<float>(0, 0) = 1;
-	//fstKernel.at<float>(0, 1) = 2;
-	//fstKernel.at<float>(0, 2) = 1;
-	//fstKernel.at<float>(1, 0) = 0;
-	//fstKernel.at<float>(1, 1) = 0;
-	//fstKernel.at<float>(1, 2) = 0;
-	//fstKernel.at<float>(2, 0) = -1;
-	//fstKernel.at<float>(2, 1) = -2;
-	//fstKernel.at<float>(2, 2) = -1;
-
-	//cout << fstKernel << endl;
 	return fstKernel;
 }
+
+
 
 /* *****************************
   GIVEN FUNCTIONS

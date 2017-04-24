@@ -129,64 +129,6 @@ thresh   minimal intensity difference to perform operation
 scale    scaling of edge enhancement
 return   enhanced image
 */
-//Mat Dip3::usm(Mat& in, int type, int size, double thresh, double scale) {
-//	########## Frequency Domain ##########
-//	// some temporary images 
-//	Mat tmp(in.rows, in.cols, CV_32FC1);
-//
-//	// calculate edge enhancement
-//
-//	// 1: smooth original image
-//	//    save result in tmp for subsequent usage
-//	switch (type) {
-//	case 0:
-//		tmp = mySmooth(in, size, 0);
-//		break;
-//	case 1:
-//		tmp = mySmooth(in, size, 1);
-//		break;
-//	case 2:
-//		tmp = mySmooth(in, size, 2);
-//		break;
-//	case 3:
-//		tmp = mySmooth(in, size, 3);
-//		break;
-//	default:
-//		GaussianBlur(in, tmp, Size(floor(size / 2) * 2 + 1, floor(size / 2) * 2 + 1), size / 5., size / 5.);
-//	}
-//
-//	// TO DO !!!
-//	/*Smooth : y0 -> y1
-//	2. Subtract : y2 = y0 – y1
-//	2.5.Scale : ý2 = s * y2
-//	3. Add : y3 = y0 + ý2
-//	-> Final(green)*/
-//	Mat fImage, fIn;
-//	//original image
-//	dft(in, fIn, 0);
-//	//smoothed image
-//	fImage = tmp;
-//	dft(fImage, fImage, 0);
-//
-//	//2. subtract
-//	subtract(fIn, fImage, fImage);
-//
-//	//3. threshold
-//	//fImage = threshold(fImage, thresh);
-//	dft(fImage, fImage, DFT_INVERSE + DFT_SCALE);
-//	threshold(fImage, fImage, thresh, 255, CV_THRESH_TOZERO);
-//	dft(fImage, fImage, 0);
-//	//4. scale
-//	fImage = fImage * scale;// (1 / abs(scale*scale));
-//
-//	//5. add
-//	add(fImage, fIn, fImage);
-//
-//	dft(fImage, fImage, DFT_INVERSE + DFT_SCALE);
-//	threshold(fImage, fImage, 255, 255, CV_THRESH_TRUNC);
-//	threshold(fImage, fImage, 0, 0, CV_THRESH_TOZERO);
-//	return fImage;
-//}
 Mat Dip3::usm(Mat& in, int type, int size, double thresh, double scale) {
 
 	Mat tmp(in.rows, in.cols, CV_32FC1);
@@ -228,21 +170,9 @@ Mat Dip3::usm(Mat& in, int type, int size, double thresh, double scale) {
 			}
 		}
 	}
-	//for (int y = 0; y < fImage.rows; y++) {
-	//	for (int x = 0; x < fImage.cols; x++) {
-	//		//3. threshold
-	//		if (abs(fImage.at<float>(Point(x, y)) <= thresh)) {
-	//			fImage.at<float>(Point(x, y)) = 0;
-	//		}
-	//	}
-	//}
-	////4. scale
-	//fImage = fImage * scale;
 
 	//5. add
 	fImage = fImage + in;
-	//add(fImage, fIn, fImage);
-
 	return fImage;
 }
 
@@ -297,12 +227,6 @@ Mat Dip3::spatialConvolution(Mat& src, Mat& kernel) {
 			if (x < (kernel.cols - 1) / 2 || x >= (src.cols - (kernel.cols - 1) / 2) ||
 				y < (kernel.rows - 1) / 2 || y >= (src.rows - (kernel.rows - 1) / 2)) {
 				src.col(x).row(y).copyTo(outputImage.col(x).row(y));
-				//for (int a = 0; a < kernel.rows*10; a++) {
-				//	for (int b = 0; b < kernel.cols*10; b++) {
-				//		float tmp = 123456789 / 12345678987654321;
-				//	}
-				//}
-				//mat1 = spatialConvolutionBorderHelper(src, kernel, Point2i(x,y));
 			}
 			else {
 				mat1 = src(rect);
